@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# hypridle-setup: re-apply idle rules after an Omarchy update wipes hypridle.conf.
+#   Plugged in: never locks, never suspends (screensaver still runs after 1 hour).
+#   On battery: locks after ~2 hours idle, suspends after 15 minutes idle.
+set -euo pipefail
+CONF="$HOME/.config/hypr/hypridle.conf"
+
+[ -f "$CONF" ] && cp "$CONF" "$CONF.bak.$(date +%s)"
+cat > "$CONF" <<'C'
+# Managed by ~/.local/bin/hypridle-setup. Re-run it after Omarchy updates.
+general {
+    lock_cmd = omarchy-system-lock
+    before_sleep_cmd = OMARCHY_LOCK_ONLY=true omarchy-system-lock
+    after_sleep_cmd = sleep 1 && omarchy-system-wake
+    inhibit_sleep = 3
+}
+
+# Screensaver after 1 hour idle (any power state)
+listener {
+    timeout = 3600
+    on-timeout = pidof hyprlock || omarchy-launch-screensaver
+}
+
+# Lock after idle, only on battery. Plugged in, it never locks.
+listener {
+    timeout = 3600
+    on-timeout = ~/.local/bin/lock-if-on-battery
+    on-resume = omarchy-system-wake
+}
+
+# Suspend after 15 minutes idle, only on battery. Plugged in, it never sleeps.
+listener {
+    timeout = 900
+    on-timeout = ~/.local/bin/suspend-if-on-battery
+}
+C
+
+if command -v omarchy-restart-hypridle >/dev/null; then
+  omarchy-restart-hypridle >/dev/null 2>&1 || true
+else
+  pkill -x hypridle || true; setsid -f hypridle >/dev/null 2>&1
+fi
+echo "hypridle rules applied: no lock or suspend while plugged in."

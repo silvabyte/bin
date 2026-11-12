@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# Update REAPER to the newest official Linux build from reaper.fm.
+# Installs to /opt/REAPER (symlink /usr/local/bin/reaper). Settings in ~/.config/REAPER are untouched.
+# First run also removes the Arch "reaper" package so there's only one copy.
+set -euo pipefail
+ARCH=$(uname -m)
+MARKER=/opt/REAPER/.installed-version
+FORCE=${1:-}
+
+page=$(curl -fsSL https://www.reaper.fm/download.php)
+file=$(grep -oE "files/[0-9]+\.x/reaper[0-9a-z]+_linux_${ARCH}\.tar\.xz" <<<"$page" | head -1)
+[[ -n "$file" ]] || { echo "Couldn't find a Linux $ARCH download on reaper.fm."; exit 1; }
+tarball=${file##*/}
+code=$(sed -E 's/^reaper([0-9a-z]+)_linux.*/\1/' <<<"$tarball")   # e.g. 785 -> 7.85
+latest="${code:0:1}.${code:1}"
+
+if [[ -f "$MARKER" ]]; then installed=$(cat "$MARKER")
+elif pacman -Q reaper &>/dev/null; then installed="$(pacman -Q reaper | awk '{print $2}') (Arch package)"
+else installed=none; fi
+echo "Installed: $installed"
+echo "reaper.fm: $latest"
+
+if [[ "$installed" == "$latest" && "$FORCE" != "--force" ]]; then
+  echo "Already on the newest REAPER. Run reaper-update --force to reinstall anyway."
+  exit 0
+fi
+
+if pgrep -x reaper >/dev/null && [[ "$FORCE" != "--force" ]]; then
+  echo "REAPER is running. Save your work and close it, then run reaper-update again."
+  exit 1
+fi
+
+tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+echo "Downloading $tarball..."
+curl -fL --progress-bar -o "$tmp/$tarball" "https://www.reaper.fm/$file"
+
+want=$(curl -fsSL 'https://www.reaper.fm/download.php?hashes=1' | grep -oE "sha256sum ${tarball}<br>[0-9a-f]{64}" | grep -oE '[0-9a-f]{64}$' || true)
+if [[ -n "$want" ]]; then
+  echo "$want  $tmp/$tarball" | sha256sum -c --quiet - || { echo "Checksum mismatch, aborting."; exit 1; }
+  echo "Checksum OK."
+else
+  echo "Warning: couldn't fetch the official checksum; continuing."
+fi
+
+tar -xf "$tmp/$tarball" -C "$tmp"
+
+echo "Installing (you may be asked for your sudo password)..."
+if pacman -Q reaper &>/dev/null; then
+  echo "Removing the Arch reaper package first (your settings stay)..."
+  sudo pacman -R --noconfirm reaper
+fi
+sudo "$tmp/reaper_linux_${ARCH}/install-reaper.sh" --install /opt --integrate-sys-desktop --usr-local-bin-symlink --quiet
+echo "$latest" | sudo tee "$MARKER" >/dev/null
+hash -r
+echo "Done: REAPER $latest is installed at /opt/REAPER."

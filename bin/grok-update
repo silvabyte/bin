@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Update the Grok Bot app (AUR: grok-bot-bin) and relaunch it.
+set -euo pipefail
+PKG=grok-bot-bin
+
+installed=$(pacman -Q "$PKG" 2>/dev/null | awk '{print $2}' || echo none)
+latest=$(yay -Si --aur "$PKG" 2>/dev/null | awk -F': *' '/^Version/{v=$2} END{print v}')
+echo "Installed: $installed"
+echo "AUR:       ${latest:-unknown}"
+
+if [[ -n "$latest" && "$installed" == "$latest" && "${1:-}" != "--force" ]]; then
+  echo "Already on the newest AUR version."
+  echo "If the app says an update is available, the AUR package hasn't caught up yet. Try again later, or run: grok-update --force"
+  exit 0
+fi
+
+echo "Updating $PKG (you may be asked for your sudo password)..."
+yay -S --noconfirm --answerclean All --answerdiff None --answeredit None "$PKG"
+
+echo "Restarting Grok Bot..."
+pkill -f '/opt/Grok Bot/grok-bot' 2>/dev/null || true
+for _ in {1..20}; do pgrep -f '/opt/Grok Bot/grok-bot' >/dev/null || break; sleep 0.5; done
+setsid -f grok-bot >/dev/null 2>&1 < /dev/null
+echo "Done: now on $(pacman -Q "$PKG" | awk '{print $2}')."
