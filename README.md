@@ -21,3 +21,5 @@ This symlinks everything in `bin/` into `~/.local/bin`, so a `git pull` updates 
 | `on-ac-power` | Exits 0 when plugged in. |
 | `lock-if-on-battery` | Locks with `omarchy-system-lock` only on battery. |
 | `suspend-if-on-battery` | Suspends only on battery. |
+| `touch-reset` | Revives a frozen touchscreen or stylus (often after suspend) by reloading `hid_multitouch`, then reloads Hyprland. |
+| `rotation-setup` | Turns on auto screen and touch rotation: installs `iio-hyprland-git` if missing, adds it to Hyprland autostart, and starts it. Optional monitor arg (default `eDP-1`). |

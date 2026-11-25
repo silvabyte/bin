@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Enable auto screen + touch rotation on Hyprland (Framework Laptop 12 convertible).
+# Installs iio-hyprland (AUR) if missing, adds it to Hyprland autostart, and starts it.
+set -euo pipefail
+MON="${1:-eDP-1}"
+CONF="$HOME/.config/hypr/autostart.conf"
+LINE="exec-once = iio-hyprland $MON"
+
+systemctl is-active --quiet iio-sensor-proxy || echo "Warning: iio-sensor-proxy is not running."
+command -v iio-hyprland >/dev/null || yay -S --needed --noconfirm --answerclean All --answerdiff None --answeredit None iio-hyprland-git
+grep -qF "iio-hyprland" "$CONF" 2>/dev/null || echo "$LINE" >> "$CONF"
+pgrep -x iio-hyprland >/dev/null || (setsid iio-hyprland "$MON" >/dev/null 2>&1 &)
+echo "Auto-rotate is on for $MON."

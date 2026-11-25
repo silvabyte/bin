@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Revive a frozen touchscreen/stylus (e.g. after suspend) by reloading hid_multitouch,
+# then reload Hyprland so it picks up the fresh input devices.
+set -euo pipefail
+echo "Reloading hid_multitouch (touchpad blinks for a second; sudo needed)..."
+sudo modprobe -r hid_multitouch
+sudo modprobe hid_multitouch
+sleep 1
+command -v hyprctl >/dev/null && hyprctl reload >/dev/null && echo "Hyprland reloaded."
+echo "Done. If the stylus still doesn't respond, check its AAAA battery or log out and back in."
